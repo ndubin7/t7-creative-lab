@@ -1,0 +1,43 @@
+name: typeset
+on:
+  push:
+    paths: ['jobs/**/spec.json']
+permissions:
+  contents: write
+concurrency:
+  group: typeset
+  cancel-in-progress: false
+env:
+  CALLBACK_URL: https://hook.eu1.make.com/hrxcqa8771z8ap0qridudnkxk7m4tvrc
+jobs:
+  typeset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pillow==11.* numpy
+      - name: Find new jobs
+        id: find
+        run: |
+          DIRS=$(git diff --name-only HEAD~1 HEAD -- 'jobs/**/spec.json' | xargs -r -n1 dirname | sort -u | tr '\n' ' ')
+          echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
+      - name: Typeset
+        if: steps.find.outputs.dirs != ''
+        run: python tools/typeset.py ${{ steps.find.outputs.dirs }}
+      - name: Commit outputs
+        if: steps.find.outputs.dirs != ''
+        run: |
+          git config user.name "t7-typesetter"; git config user.email "t7-typesetter@users.noreply.github.com"
+          git add jobs; git commit -m "typeset: ${{ steps.find.outputs.dirs }}" || exit 0
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+      - name: Report back to Make
+        if: steps.find.outputs.dirs != ''
+        run: |
+          for d in ${{ steps.find.outputs.dirs }}; do
+            JOB=$(basename "$d")
+            REPORT=$(cat "$d/report.json")
+            curl -s -X POST "$CALLBACK_URL" -H "Content-Type: application/json" \
+              -d "{\"job\":\"$JOB\",\"report\":$REPORT}"
+          done
