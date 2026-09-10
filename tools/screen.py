@@ -83,7 +83,12 @@ def render_screen(im, corners, spec, fontpath):
             f = _font(fontpath, sz); lines = _wrap(d, text, f, inner)
             if len(lines) <= 5 and all(d.textlength(l, font=f) <= inner for l in lines): break
             sz -= 4
-        lh = int(sz*1.1); y = int(CH*0.07)
+        lh = int(sz*1.1)
+        # keep the headline inside MGID's 16:9 crop band: start it below the band's top edge
+        tl, tr, br, bl = corners; top_img = (tl[1]+tr[1])/2; bot_img = (bl[1]+br[1])/2; Himg = im.size[1]
+        band_top = 0.25*Himg
+        frac = 0.0 if top_img >= band_top else (band_top-top_img)/max(1, bot_img-top_img)
+        y = int(CH*max(0.07, frac+0.03))
         for l in lines: d.text((pad, y), l, font=f, fill=ink); y += lh
         y += int(CW*0.05); d.rounded_rectangle((pad, y, CW-pad, y+int(CW*0.45)), radius=18, fill=(205, 208, 214, 255)); y += int(CW*0.55)
         for i in range(4): d.rounded_rectangle((pad, y, CW-pad-(i % 2)*120, y+26), radius=13, fill=(215, 218, 223, 255)); y += 60
