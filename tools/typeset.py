@@ -26,7 +26,7 @@ def typeset(job):
     if not sc and spec.get('parent'):   # edits inherit the parent's in-screen text
         pp = os.path.join(os.path.dirname(job.rstrip('/')), spec['parent'], 'spec.json')
         if os.path.exists(pp): sc = json.load(open(pp)).get('screen') or {}
-    if sc.get('type') in ('search', 'article') and sc.get('text', '').strip():
+    if sc.get('type') in ('search', 'article', 'message', 'notification') and sc.get('text', '').strip():
         corners, frac = find_screen(im)
         screen_info = {"requested": True, "found": corners is not None, "area_frac": round(float(frac), 3)}
         if corners:
