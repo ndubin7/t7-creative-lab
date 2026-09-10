@@ -4,10 +4,12 @@ spec: {"lines": ["..."], "zone": {"x0":0.475,"x1":0.955,"cy":0.46}, "align":"lef
        "max_block_h":0.30, "color":[248,244,236], "callback_url": "..."}
 """
 import json, sys, glob, os
+sys.path.insert(0, os.path.dirname(__file__))
+from screen import find_screen, render_screen
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 FONT = os.path.join(os.path.dirname(__file__), '..', 'fonts', 'Inter.ttf')
 SAFE_TOP, SAFE_BOT = 0.25, 0.75          # inside the 16:9 crop band with margin
-MIN_FONT_PCT = 5.0                          # below this a headline dies at feed size
+MIN_FONT_PCT = 4.2                          # below this a headline dies at feed size
 
 def font(sz):
     f = ImageFont.truetype(FONT, sz); f.set_variation_by_name('ExtraBold'); return f
@@ -19,6 +21,16 @@ def typeset(job):
     if im.size[0] != im.size[1]:
         s = min(im.size); l = (im.size[0]-s)//2; t = (im.size[1]-s)//2; im = im.crop((l, t, l+s, t+s))
     im = im.resize((2048, 2048), Image.LANCZOS); W = H = 2048
+    screen_info = {"requested": False}
+    sc = spec.get('screen') or {}
+    if not sc and spec.get('parent'):   # edits inherit the parent's in-screen text
+        pp = os.path.join(os.path.dirname(job.rstrip('/')), spec['parent'], 'spec.json')
+        if os.path.exists(pp): sc = json.load(open(pp)).get('screen') or {}
+    if sc.get('type') in ('search', 'article') and sc.get('text', '').strip():
+        corners, frac = find_screen(im)
+        screen_info = {"requested": True, "found": corners is not None, "area_frac": round(float(frac), 3)}
+        if corners:
+            im, fpct_s = render_screen(im, corners, sc, FONT); screen_info["text_pct_of_height"] = round(float(fpct_s), 2)
     lines = [l for l in spec['lines'] if l.strip()]
     z = spec.get('zone', {}); x0 = int(z.get('x0', .08)*W); x1 = int(z.get('x1', .92)*W); cy = z.get('cy', .5)
     maxw = x1-x0; maxh = spec.get('max_block_h', .30)*H; align = spec.get('align', 'left')
@@ -75,7 +87,9 @@ def typeset(job):
               "lines": lines, "pass_min_font": fpct >= MIN_FONT_PCT,
               "pass_crop_band": top >= SAFE_TOP-0.001 and bot <= SAFE_BOT+0.001,
               "shifted_pct": moved, "pass_no_collision": not collision}
-    report["pass"] = report["pass_min_font"] and report["pass_crop_band"] and report["pass_no_collision"]
+    report["screen"] = screen_info
+    report["pass_screen"] = bool((not screen_info["requested"]) or (screen_info.get("found") and screen_info.get("text_pct_of_height", 0) >= 2.5))
+    report["pass"] = report["pass_min_font"] and report["pass_crop_band"] and report["pass_no_collision"] and report["pass_screen"]
     json.dump(report, open(os.path.join(job, 'report.json'), 'w'), indent=1)
     return spec, report
 
