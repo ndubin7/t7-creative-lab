@@ -1,0 +1,20 @@
+{
+ "font_pct_of_height": 4.3,
+ "text_top": 0.411,
+ "text_bottom": 0.509,
+ "lines": [
+  "Who qualifies for",
+  "weight-loss medication?"
+ ],
+ "pass_min_font": true,
+ "pass_crop_band": true,
+ "shifted_pct": 0,
+ "final_cy": 0.46,
+ "widened_pct": 0,
+ "pass_no_collision": true,
+ "screen": {
+  "requested": false
+ },
+ "pass_screen": true,
+ "pass": true
+}
