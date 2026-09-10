@@ -1,0 +1,23 @@
+{
+ "font_pct_of_height": 4.1,
+ "text_top": 0.453,
+ "text_bottom": 0.547,
+ "lines": [
+  "Still not sure.",
+  "Read this first."
+ ],
+ "pass_min_font": false,
+ "pass_crop_band": true,
+ "shifted_pct": 1,
+ "final_cy": 0.5,
+ "widened_pct": 2,
+ "pass_no_collision": true,
+ "screen": {
+  "requested": true,
+  "found": true,
+  "area_frac": 0.127,
+  "text_pct_of_height": 4.26
+ },
+ "pass_screen": true,
+ "pass": false
+}
