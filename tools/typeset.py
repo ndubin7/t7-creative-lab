@@ -69,6 +69,22 @@ def typeset(job):
         score = (ok, sz, -abs(dy))
         if best is None or score > best[0]: best = (score, x0, sz, cy, moved)
     _, x0, sz, cy, moved = best
+    # If the strategist's zone is too narrow for readable type, widen it toward the open side,
+    # one percent at a time, only while an 8%-of-width gap beyond the text stays empty and dark.
+    widened = 0
+    def gap_clear(xr, sz):
+        f, lh, bh, y0 = layout(x0, sz); pad = int(0.03*H)
+        box = (xr, max(0, y0-pad), min(W, xr+int(0.08*W)), min(H, y0+bh+pad))
+        if box[2]-box[0] < int(0.08*W): return False
+        hist = lum.crop(box).histogram(); bright = sum(hist[140:])/max(1, sum(hist))
+        eh = edges.crop(box).histogram(); sharp = sum(eh[20:])/max(1, sum(eh))
+        return bright < 0.004 and sharp < 0.0003
+    if align == 'left':
+        while sz/H*100 < MIN_FONT_PCT and widened < 12:
+            f0 = font(sz); textr = x0+int(max(f0.getlength(l) for l in lines))
+            if not gap_clear(textr+int(0.01*W), sz+2): break
+            x1 += int(0.01*W); widened += 1
+            while fits(x0, sz+2) and not collides(x0, sz+2): sz += 2
     f, lh, bh, y0 = layout(x0, sz); maxw = x1-x0
     collision = collides(x0, sz)
     color = tuple(spec.get('color', [248, 244, 236]))
@@ -96,7 +112,7 @@ def typeset(job):
     report = {"font_pct_of_height": round(fpct, 2), "text_top": round(top, 3), "text_bottom": round(bot, 3),
               "lines": lines, "pass_min_font": fpct >= MIN_FONT_PCT,
               "pass_crop_band": top >= SAFE_TOP-0.001 and bot <= SAFE_BOT+0.001,
-              "shifted_pct": moved, "final_cy": round(cy, 3), "pass_no_collision": not collision}
+              "shifted_pct": moved, "final_cy": round(cy, 3), "widened_pct": widened, "pass_no_collision": not collision}
     report["screen"] = screen_info
     report["pass_screen"] = bool((not screen_info["requested"]) or (screen_info.get("found") and screen_info.get("text_pct_of_height", 0) >= 2.5))
     report["pass"] = report["pass_min_font"] and report["pass_crop_band"] and report["pass_no_collision"] and report["pass_screen"]
