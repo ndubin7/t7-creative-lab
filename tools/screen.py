@@ -33,6 +33,17 @@ def _coeffs(dst, src):
     return np.linalg.solve(np.array(A, float), np.array(B, float)).tolist()
 
 def _wrap(draw, text, f, maxw):
+    # allow breaks after hyphens so compound words like weight-loss do not cap the font size
+    words = text.replace('-', '- ').split(); words = [w if w.endswith('-') else w+' ' for w in words]
+    lines = []; cur = ''
+    for w in words:
+        t = cur+w
+        if draw.textlength(t.strip(), font=f) <= maxw: cur = t
+        else: lines.append(cur.strip()); cur = w
+    if cur.strip(): lines.append(cur.strip())
+    return lines
+
+def _wrap_old(draw, text, f, maxw):
     words = text.split(); lines = []; cur = ''
     for w in words:
         t = (cur+' '+w).strip()
@@ -65,13 +76,14 @@ def render_screen(im, corners, spec, fontpath):
         fr = _font(fontpath, max(34, int(sz*0.42)), 'Medium'); y = top+ph+int(CW*0.06)
         for rw in rows:
             d.text((pad+pin, y), rw, font=fr, fill=grey); y += int(sz*0.62)
-    else:  # article
-        sz = 140
+    else:  # article: the headline is the hook, so it gets the biggest size that fits 5 lines
+        pad = int(CW*0.06); inner = CW-2*pad
+        sz = 260
         while sz > 40:
             f = _font(fontpath, sz); lines = _wrap(d, text, f, inner)
-            if len(lines) <= 4: break
+            if len(lines) <= 5 and all(d.textlength(l, font=f) <= inner for l in lines): break
             sz -= 4
-        lh = int(sz*1.1); y = int(CH*0.09)
+        lh = int(sz*1.1); y = int(CH*0.07)
         for l in lines: d.text((pad, y), l, font=f, fill=ink); y += lh
         y += int(CW*0.05); d.rounded_rectangle((pad, y, CW-pad, y+int(CW*0.45)), radius=18, fill=(205, 208, 214, 255)); y += int(CW*0.55)
         for i in range(4): d.rounded_rectangle((pad, y, CW-pad-(i % 2)*120, y+26), radius=13, fill=(215, 218, 223, 255)); y += 60
