@@ -1,0 +1,14 @@
+{
+ "font_pct_of_height": 5.27,
+ "text_top": 0.439,
+ "text_bottom": 0.561,
+ "lines": [
+  "Most never ask.",
+  "So they guess."
+ ],
+ "pass_min_font": true,
+ "pass_crop_band": true,
+ "shifted_pct": 0,
+ "pass_no_collision": true,
+ "pass": true
+}
