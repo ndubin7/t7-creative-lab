@@ -27,9 +27,28 @@ def typeset(job):
         f = font(sz+2); lh = (sz+2)*1.15
         if max(f.getlength(l) for l in lines) > maxw or lh*len(lines) > maxh: break
         sz += 2
-    f = font(sz); lh = int(sz*1.15); bh = lh*len(lines)
-    y0 = int(cy*H - bh/2)
-    y0 = max(int(SAFE_TOP*H), min(y0, int(SAFE_BOT*H)-bh))   # clamp into crop-safe band
+    # collision guard: off-white text needs a dark background. Push the block right
+    # (or left for right-aligned zones) until no bright subject pixels sit under it.
+    lum = im.convert('L'); edges = lum.filter(ImageFilter.GaussianBlur(3)).filter(ImageFilter.FIND_EDGES)
+    def layout(x0, sz):
+        f = font(sz); lh = int(sz*1.15); bh = lh*len(lines)
+        y0 = int(cy*H - bh/2); y0 = max(int(SAFE_TOP*H), min(y0, int(SAFE_BOT*H)-bh))
+        return f, lh, bh, y0
+    def fits(x0, sz):
+        f = font(sz); return max(f.getlength(l) for l in lines) <= x1-x0 and sz*1.15*len(lines) <= maxh
+    def collides(x0, sz):
+        f, lh, bh, y0 = layout(x0, sz); w = int(max(f.getlength(l) for l in lines))
+        pad = int(0.05*W); box = (max(0, x0-pad), max(0, y0-pad), min(W, x0+w+pad), min(H, y0+bh+pad))
+        hist = lum.crop(box).histogram(); total = sum(hist); bright = sum(hist[165:])
+        strip = (max(0, x0-pad), box[1], x0, box[3]) if align != 'right' else (x0+w, box[1], min(W, x0+w+pad), box[3])
+        eh = edges.crop(strip).histogram(); st = max(1, sum(eh)); sharp = sum(eh[20:])
+        return bright/total > 0.004 or sharp/st > 0.0003
+    moved = 0
+    while collides(x0, sz) and x0 < x1-int(0.2*W):
+        x0 += int(0.01*W); moved += 1
+        while not fits(x0, sz) and sz > 30: sz -= 2
+    f, lh, bh, y0 = layout(x0, sz); maxw = x1-x0
+    collision = collides(x0, sz)
     color = tuple(spec.get('color', [248, 244, 236]))
     pos = []
     for i, l in enumerate(lines):
@@ -54,8 +73,9 @@ def typeset(job):
     fpct = sz/H*100; top = y0/H; bot = (y0+bh)/H
     report = {"font_pct_of_height": round(fpct, 2), "text_top": round(top, 3), "text_bottom": round(bot, 3),
               "lines": lines, "pass_min_font": fpct >= MIN_FONT_PCT,
-              "pass_crop_band": top >= SAFE_TOP-0.001 and bot <= SAFE_BOT+0.001}
-    report["pass"] = report["pass_min_font"] and report["pass_crop_band"]
+              "pass_crop_band": top >= SAFE_TOP-0.001 and bot <= SAFE_BOT+0.001,
+              "shifted_pct": moved, "pass_no_collision": not collision}
+    report["pass"] = report["pass_min_font"] and report["pass_crop_band"] and report["pass_no_collision"]
     json.dump(report, open(os.path.join(job, 'report.json'), 'w'), indent=1)
     return spec, report
 
