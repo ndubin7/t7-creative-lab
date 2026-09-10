@@ -1,0 +1,12 @@
+{
+ "font_pct_of_height": 5.57,
+ "text_top": 0.436,
+ "text_bottom": 0.564,
+ "lines": [
+  "Most never ask.",
+  "You just did."
+ ],
+ "pass_min_font": true,
+ "pass_crop_band": true,
+ "pass": true
+}
