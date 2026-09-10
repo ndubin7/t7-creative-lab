@@ -1,0 +1,20 @@
+{
+ "font_pct_of_height": 4.79,
+ "text_top": 0.255,
+ "text_bottom": 0.364,
+ "lines": [
+  "Prescription weight loss.",
+  "With a licensed clinician."
+ ],
+ "pass_min_font": true,
+ "pass_crop_band": true,
+ "shifted_pct": 0,
+ "final_cy": 0.31,
+ "widened_pct": 0,
+ "pass_no_collision": true,
+ "screen": {
+  "requested": false
+ },
+ "pass_screen": true,
+ "pass": true
+}
