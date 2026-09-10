@@ -76,7 +76,7 @@ def render_screen(im, corners, spec, fontpath):
         fr = _font(fontpath, max(34, int(sz*0.42)), 'Medium'); y = top+ph+int(CW*0.06)
         for rw in rows:
             d.text((pad+pin, y), rw, font=fr, fill=grey); y += int(sz*0.62)
-    else:  # article: the headline is the hook, so it gets the biggest size that fits 5 lines
+    elif spec.get('type') == 'article':  # the headline is the hook, so it gets the biggest size that fits 5 lines
         pad = int(CW*0.06); inner = CW-2*pad
         sz = 260
         while sz > 40:
@@ -98,7 +98,66 @@ def render_screen(im, corners, spec, fontpath):
         for l in lines: d.text((pad, y), l, font=f, fill=ink); y += lh
         y += int(ks*0.8); d.line((pad, y, pad+int(inner*0.35), y), fill=(200, 204, 210, 255), width=4)
         y += int(ks*0.8); d.text((pad, y), "5 min read", font=mf, fill=grey)
+    elif spec.get('type') in ('message', 'notification'):
+        tl, tr, br, bl = corners; top_img = (tl[1]+tr[1])/2; bot_img = (bl[1]+br[1])/2; Himg = im.size[1]
+        def to_c(yimg): return (yimg-top_img)/max(1, bot_img-top_img)*CH
+        vis_top = max(to_c(0.25*Himg), CH*0.06); vis_bot = min(to_c(0.75*Himg), CH*0.94)
+        if spec['type'] == 'message':
+            # iMessage-style received bubble: the message is the hook, so it gets the biggest size that fits
+            pad = int(CW*0.05); bin_ = int(CW*0.05); maxb = int(CW*0.86)-2*bin_
+            sz = 220
+            while sz > 40:
+                f = _font(fontpath, sz, 'SemiBold'); lines = _wrap(d, text, f, maxb)
+                if len(lines) <= 5 and all(d.textlength(l, font=f) <= maxb for l in lines): break
+                sz -= 4
+            lh = int(sz*1.12); bw = int(max(d.textlength(l, font=f) for l in lines))+2*bin_; bh = lh*len(lines)+2*bin_-int(sz*0.12)
+            ts = max(28, int(sz*0.3)); tf = _font(fontpath, ts, 'Medium')
+            block = ts*2.2 + bh + (int(sz*0.9)+2*bin_ if rows else 0)
+            y = int(max(vis_top, (vis_top+vis_bot)/2 - block/2))
+            stamp = "Today 10:42 PM"; d.text(((CW-d.textlength(stamp, font=tf))/2, y), stamp, font=tf, fill=grey); y += int(ts*2.2)
+            d.rounded_rectangle((pad, y, pad+bw, y+bh), radius=int(min(bh/2, CW*0.07)), fill=(233, 233, 235, 255))
+            for i, l in enumerate(lines): d.text((pad+bin_, y+bin_+i*lh-int(sz*0.1)), l, font=f, fill=ink)
+            y += bh+int(CW*0.03)
+            if rows:
+                s2 = int(sz*0.75)
+                while s2 > 30 and d.textlength(rows[0], font=_font(fontpath, s2, 'SemiBold')) > maxb: s2 -= 2
+                f2 = _font(fontpath, s2, 'SemiBold'); w2 = int(d.textlength(rows[0], font=f2))+2*bin_; h2 = int(s2*1.1)+2*bin_
+                d.rounded_rectangle((pad, y, pad+min(w2, CW-2*pad), y+h2), radius=int(h2/2), fill=(233, 233, 235, 255))
+                d.text((pad+bin_, y+bin_-int(s2*0.1)), rows[0], font=f2, fill=ink)
+        else:
+            # lock screen: dark wallpaper, clock, one notification card carrying the headline
+            for yy in range(CH):
+                t = yy/max(1, CH); d.line((0, yy, CW, yy), fill=(int(18+12*t), int(40+18*t), int(46+20*t), 255))
+            pad = int(CW*0.035); cin = int(CW*0.045); tw = CW-2*pad-2*cin
+            sz = 240
+            while sz > 40:
+                f = _font(fontpath, sz, 'Bold'); lines = _wrap(d, text, f, tw)
+                if len(lines) <= 5 and all(d.textlength(l, font=f) <= tw for l in lines): break
+                sz -= 4
+            lh = int(sz*1.1); ls = max(30, int(sz*0.34)); lf = _font(fontpath, ls, 'SemiBold')
+            ch = int(ls*1.9)+lh*len(lines)+2*cin; ck = _font(fontpath, int(CW*0.15), 'Light'); ckh = int(CW*0.2)
+            block = ckh+int(CW*0.06)+ch
+            y = int(max(vis_top, (vis_top+vis_bot)/2 - block/2))
+            clock = "10:42"; d.text(((CW-d.textlength(clock, font=ck))/2, y), clock, font=ck, fill=(245, 245, 247, 255)); y += ckh+int(CW*0.06)
+            d.rounded_rectangle((pad, y, CW-pad, y+ch), radius=int(CW*0.06), fill=(244, 244, 246, 240))
+            d.text((pad+cin, y+cin), "NEWS  \u00b7  now", font=lf, fill=grey)
+            for i, l in enumerate(lines): d.text((pad+cin, y+cin+int(ls*1.9)+i*lh-int(sz*0.08)), l, font=f, fill=ink)
+    if spec.get('type') == 'notification':
+        cx0 = sum(p[0] for p in corners)/4; cy0 = sum(p[1] for p in corners)/4
+        corners = [(cx0+(x-cx0)*1.075, cy0+(y-cy0)*1.03) for x, y in corners]
     src = [(0, 0), (CW, 0), (CW, CH), (0, CH)]
     warped = cv.transform(im.size, Image.PERSPECTIVE, _coeffs(corners, src), Image.BICUBIC).filter(ImageFilter.GaussianBlur(0.8))
-    out = Image.alpha_composite(im.convert('RGBA'), warped).convert('RGB')
+    base = im.convert('RGBA')
+    if spec.get('type') == 'notification':
+        # repaint leftover bright screen edge pixels (dimmer than the detector threshold) in wallpaper colour
+        xs = [p[0] for p in corners]; ys = [p[1] for p in corners]
+        box = (int(max(0, min(xs)-0.04*im.size[0])), int(max(0, min(ys)-0.02*im.size[1])), int(min(im.size[0], max(xs)+0.04*im.size[0])), int(min(im.size[1], max(ys)+0.02*im.size[1])))
+        reg = np.array(base.crop(box)); rgb = reg[..., :3].astype(int); lum = rgb.mean(axis=2)
+        sat = rgb.max(axis=2)-rgb.min(axis=2)
+        cx0 = sum(p[0] for p in corners)/4; cy0 = sum(p[1] for p in corners)/4
+        poly = [(cx0+(x-cx0)*1.06-box[0], cy0+(y-cy0)*1.03-box[1]) for x, y in corners]
+        pm = Image.new('L', (box[2]-box[0], box[3]-box[1]), 0); ImageDraw.Draw(pm).polygon(poly, fill=255)
+        m = (lum > 120) & (sat < 40) & (np.array(pm) > 0)   # neutral white screen glow only, never warm skin
+        reg[m] = (24, 50, 58, 255); base.paste(Image.fromarray(reg), box[:2])
+    out = Image.alpha_composite(base, warped).convert('RGB')
     return out, sz/CH*(h/im.size[1])*100   # query font as percent of full image height
