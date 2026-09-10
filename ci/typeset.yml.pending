@@ -38,6 +38,7 @@ jobs:
           for d in ${{ steps.find.outputs.dirs }}; do
             JOB=$(basename "$d")
             REPORT=$(cat "$d/report.json")
+            SHA=$(git rev-parse HEAD)
             curl -s -X POST "$CALLBACK_URL" -H "Content-Type: application/json" \
-              -d "{\"job\":\"$JOB\",\"report\":$REPORT}"
+              -d "{\"job\":\"$JOB\",\"sha\":\"$SHA\",\"report\":$REPORT}"
           done
