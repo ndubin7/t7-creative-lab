@@ -55,10 +55,20 @@ def typeset(job):
         strip = (max(0, x0-pad), box[1], x0, box[3]) if align != 'right' else (x0+w, box[1], min(W, x0+w+pad), box[3])
         eh = edges.crop(strip).histogram(); st = max(1, sum(eh)); sharp = sum(eh[20:])
         return bright/total > 0.004 or sharp/st > 0.0003
-    moved = 0
-    while collides(x0, sz) and x0 < x1-int(0.2*W):
-        x0 += int(0.01*W); moved += 1
-        while not fits(x0, sz) and sz > 30: sz -= 2
+    # Try the requested height first, then nearby heights inside the crop band, and keep
+    # whichever placement allows the biggest collision-free text (vertical move beats shrinking).
+    X0, SZ, CY = x0, sz, cy; best = None
+    for dy in (0, .05, -.05, .10, -.10, .15, -.15):
+        cy = CY+dy
+        if cy < SAFE_TOP+.06 or cy > SAFE_BOT-.06: continue
+        x0, sz, moved = X0, SZ, 0
+        while collides(x0, sz) and x0 < x1-int(0.2*W):
+            x0 += int(0.01*W); moved += 1
+            while not fits(x0, sz) and sz > 30: sz -= 2
+        ok = not collides(x0, sz)
+        score = (ok, sz, -abs(dy))
+        if best is None or score > best[0]: best = (score, x0, sz, cy, moved)
+    _, x0, sz, cy, moved = best
     f, lh, bh, y0 = layout(x0, sz); maxw = x1-x0
     collision = collides(x0, sz)
     color = tuple(spec.get('color', [248, 244, 236]))
@@ -86,7 +96,7 @@ def typeset(job):
     report = {"font_pct_of_height": round(fpct, 2), "text_top": round(top, 3), "text_bottom": round(bot, 3),
               "lines": lines, "pass_min_font": fpct >= MIN_FONT_PCT,
               "pass_crop_band": top >= SAFE_TOP-0.001 and bot <= SAFE_BOT+0.001,
-              "shifted_pct": moved, "pass_no_collision": not collision}
+              "shifted_pct": moved, "final_cy": round(cy, 3), "pass_no_collision": not collision}
     report["screen"] = screen_info
     report["pass_screen"] = bool((not screen_info["requested"]) or (screen_info.get("found") and screen_info.get("text_pct_of_height", 0) >= 2.5))
     report["pass"] = report["pass_min_font"] and report["pass_crop_band"] and report["pass_no_collision"] and report["pass_screen"]
