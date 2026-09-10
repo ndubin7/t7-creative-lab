@@ -3,14 +3,14 @@
  "text_top": 0.451,
  "text_bottom": 0.549,
  "lines": [
-  "Still not sure.",
+  "Still not sure?",
   "Start here."
  ],
  "pass_min_font": true,
  "pass_crop_band": true,
  "shifted_pct": 1,
  "final_cy": 0.5,
- "widened_pct": 0,
+ "widened_pct": 1,
  "pass_no_collision": true,
  "screen": {
   "requested": true,
