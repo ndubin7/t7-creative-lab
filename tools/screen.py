@@ -84,14 +84,20 @@ def render_screen(im, corners, spec, fontpath):
             if len(lines) <= 5 and all(d.textlength(l, font=f) <= inner for l in lines): break
             sz -= 4
         lh = int(sz*1.1)
-        # keep the headline inside MGID's 16:9 crop band: start it below the band's top edge
+        # Clean story-card layout: small section label, big headline, thin rule, read time.
+        # No placeholder images or fake body bars. The block is centred on the part of the
+        # screen that survives MGID's 16:9 crop, so the headline is never sliced.
         tl, tr, br, bl = corners; top_img = (tl[1]+tr[1])/2; bot_img = (bl[1]+br[1])/2; Himg = im.size[1]
-        band_top = 0.25*Himg
-        frac = 0.0 if top_img >= band_top else (band_top-top_img)/max(1, bot_img-top_img)
-        y = int(CH*max(0.07, frac+0.03))
+        def to_c(yimg): return (yimg-top_img)/max(1, bot_img-top_img)*CH
+        vis_top = max(to_c(0.25*Himg), CH*0.06); vis_bot = min(to_c(0.75*Himg), CH*0.94)
+        ks = max(28, int(sz*0.32)); kf = _font(fontpath, ks); mf = _font(fontpath, ks)
+        accent = (31, 111, 120, 255); grey = (120, 126, 136, 255)
+        block = ks*1.9 + lh*len(lines) + ks*0.8 + 4 + ks*0.8 + ks
+        y = int(max(vis_top, (vis_top+vis_bot)/2 - block/2))
+        d.text((pad, y), "Health", font=kf, fill=accent); y += int(ks*1.9)
         for l in lines: d.text((pad, y), l, font=f, fill=ink); y += lh
-        y += int(CW*0.05); d.rounded_rectangle((pad, y, CW-pad, y+int(CW*0.45)), radius=18, fill=(205, 208, 214, 255)); y += int(CW*0.55)
-        for i in range(4): d.rounded_rectangle((pad, y, CW-pad-(i % 2)*120, y+26), radius=13, fill=(215, 218, 223, 255)); y += 60
+        y += int(ks*0.8); d.line((pad, y, pad+int(inner*0.35), y), fill=(200, 204, 210, 255), width=4)
+        y += int(ks*0.8); d.text((pad, y), "5 min read", font=mf, fill=grey)
     src = [(0, 0), (CW, 0), (CW, CH), (0, CH)]
     warped = cv.transform(im.size, Image.PERSPECTIVE, _coeffs(corners, src), Image.BICUBIC).filter(ImageFilter.GaussianBlur(0.8))
     out = Image.alpha_composite(im.convert('RGBA'), warped).convert('RGB')
