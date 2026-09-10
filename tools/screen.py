@@ -110,20 +110,25 @@ def render_screen(im, corners, spec, fontpath):
                 f = _font(fontpath, sz, 'SemiBold'); lines = _wrap(d, text, f, maxb)
                 if len(lines) <= 5 and all(d.textlength(l, font=f) <= maxb for l in lines): break
                 sz -= 4
-            lh = int(sz*1.12); bw = int(max(d.textlength(l, font=f) for l in lines))+2*bin_; bh = lh*len(lines)+2*bin_-int(sz*0.12)
+            # Bubble geometry from real glyph extents, so padding is equal on all four sides.
+            lh = int(sz*1.12); tb = f.getbbox("Hgy?"); top_off, bot_off = tb[1], tb[3]
+            def bubble_h(n): return (n-1)*lh + (bot_off-top_off) + 2*bin_
+            # Follow-up bubble uses the SAME type size, wrapped if needed, as a real messaging app would.
+            rl = _wrap(d, rows[0], f, maxb) if rows else []
+            bw = int(max(d.textlength(l, font=f) for l in lines))+2*bin_; bh = bubble_h(len(lines))
+            gap = int(CW*0.025); bh2 = bubble_h(len(rl)) if rl else 0
             ts = max(28, int(sz*0.3)); tf = _font(fontpath, ts, 'Medium')
-            block = ts*2.2 + bh + (int(sz*0.9)+2*bin_ if rows else 0)
+            block = ts*2.2 + bh + (gap+bh2 if rl else 0)
             y = int(max(vis_top, (vis_top+vis_bot)/2 - block/2))
             stamp = "Today 10:42 PM"; d.text(((CW-d.textlength(stamp, font=tf))/2, y), stamp, font=tf, fill=grey); y += int(ts*2.2)
-            d.rounded_rectangle((pad, y, pad+bw, y+bh), radius=int(min(bh/2, CW*0.07)), fill=(233, 233, 235, 255))
-            for i, l in enumerate(lines): d.text((pad+bin_, y+bin_+i*lh-int(sz*0.1)), l, font=f, fill=ink)
-            y += bh+int(CW*0.03)
-            if rows:
-                s2 = int(sz*0.75)
-                while s2 > 30 and d.textlength(rows[0], font=_font(fontpath, s2, 'SemiBold')) > maxb: s2 -= 2
-                f2 = _font(fontpath, s2, 'SemiBold'); w2 = int(d.textlength(rows[0], font=f2))+2*bin_; h2 = int(s2*1.1)+2*bin_
-                d.rounded_rectangle((pad, y, pad+min(w2, CW-2*pad), y+h2), radius=int(h2/2), fill=(233, 233, 235, 255))
-                d.text((pad+bin_, y+bin_-int(s2*0.1)), rows[0], font=f2, fill=ink)
+            rad = int(min(lh*0.55+bin_, CW*0.07))
+            d.rounded_rectangle((pad, y, pad+bw, y+bh), radius=rad, fill=(233, 233, 235, 255))
+            for i, l in enumerate(lines): d.text((pad+bin_, y+bin_-top_off+i*lh), l, font=f, fill=ink)
+            y += bh+gap
+            if rl:
+                bw2 = int(max(d.textlength(l, font=f) for l in rl))+2*bin_
+                d.rounded_rectangle((pad, y, pad+bw2, y+bh2), radius=rad, fill=(233, 233, 235, 255))
+                for i, l in enumerate(rl): d.text((pad+bin_, y+bin_-top_off+i*lh), l, font=f, fill=ink)
         else:
             # lock screen: dark wallpaper, clock, one notification card carrying the headline
             for yy in range(CH):
