@@ -34,11 +34,48 @@ def typeset(job):
     lines = [l for l in spec['lines'] if l.strip()]
     z = spec.get('zone', {}); x0 = int(z.get('x0', .08)*W); x1 = int(z.get('x1', .92)*W); cy = z.get('cy', .5)
     maxw = x1-x0; maxh = spec.get('max_block_h', .30)*H; align = spec.get('align', 'left')
-    sz = 30
-    while True:
-        f = font(sz+2); lh = (sz+2)*1.15
-        if max(f.getlength(l) for l in lines) > maxw or lh*len(lines) > maxh: break
-        sz += 2
+    def biggest(ls):
+        sz = 30
+        while True:
+            f = font(sz+2); lh = (sz+2)*1.15
+            if max(f.getlength(l) for l in ls) > maxw or lh*len(ls) > maxh: break
+            sz += 2
+        return sz
+    # Smart re-wrap: if the copy sets bigger as a balanced three-line block, use that instead.
+    rewrapped = False
+    words = " ".join(lines).split()
+    joined = " ".join(lines).strip()
+    single_sentence = not any(m in joined[:-1] for m in ('. ', '? ', '! '))
+    if len(lines) <= 2 and len(words) >= 3 and single_sentence:
+        f0 = font(100); best3 = None
+        for i in range(1, len(words)-1):
+            for j in range(i+1, len(words)):
+                cand = [" ".join(words[:i]), " ".join(words[i:j]), " ".join(words[j:])]
+                w = max(f0.getlength(c) for c in cand)
+                if best3 is None or w < best3[0]: best3 = (w, cand)
+        if best3 and biggest(best3[1]) > biggest(lines)*1.12:
+            lines = best3[1]; rewrapped = True
+    sz = biggest(lines)
+    # Soft shadow: off-white type needs a darker ground. If the headline area is bright, darken it
+    # with a feathered gradient (strongest under the text, fading out before any subject). No box.
+    scrim = 0.0
+    lum0 = im.convert('L'); zb = (x0, int(max(0, cy-.15)*H), x1, int(min(1, cy+.15)*H))
+    hist = lum0.crop(zb).histogram(); n = max(1, sum(hist)); mean = sum(i*c for i, c in enumerate(hist))/n
+    if mean > 85:
+        scrim = round(min(0.82, 1-55/mean), 2)
+        mask = Image.new('L', (W, H), 0); mp = mask.load()
+        fade = int(0.10*W); ytop, ybot = int((cy-.17)*H), int((cy+.17)*H); yf = int(0.12*H)
+        for x in range(W):
+            if align != 'right':
+                ax = 1.0 if x <= x1-fade//2 else max(0.0, 1-(x-(x1-fade//2))/fade)
+            else:
+                ax = 1.0 if x >= x0+fade//2 else max(0.0, 1-((x0+fade//2)-x)/fade)
+            if ax <= 0: continue
+            for y in range(max(0, ytop-yf), min(H, ybot+yf)):
+                ay = 1.0 if ytop <= y <= ybot else max(0.0, 1-(min(abs(y-ytop), abs(y-ybot)))/yf)
+                mp[x, y] = int(255*scrim*ax*ay)
+        mask = mask.filter(ImageFilter.GaussianBlur(40))
+        im = Image.composite(Image.new('RGB', (W, H), (14, 24, 26)), im, mask)
     # collision guard: off-white text needs a dark background. Push the block right
     # (or left for right-aligned zones) until no bright subject pixels sit under it.
     lum = im.convert('L'); edges = lum.filter(ImageFilter.GaussianBlur(3)).filter(ImageFilter.FIND_EDGES)
@@ -54,6 +91,8 @@ def typeset(job):
         hist = lum.crop(box).histogram(); total = sum(hist); bright = sum(hist[165:])
         strip = (max(0, x0-pad), box[1], x0, box[3]) if align != 'right' else (x0+w, box[1], min(W, x0+w+pad), box[3])
         eh = edges.crop(strip).histogram(); st = max(1, sum(eh)); sharp = sum(eh[20:])
+        if scrim > 0:   # under a soft shadow, texture is fine; only stray highlights hurt legibility
+            return sum(hist[190:])/total > 0.006
         return bright/total > 0.004 or sharp/st > 0.0003
     # Try the requested height first, then nearby heights inside the crop band, and keep
     # whichever placement allows the biggest collision-free text (vertical move beats shrinking).
@@ -62,6 +101,9 @@ def typeset(job):
         cy = CY+dy
         if cy < SAFE_TOP+.06 or cy > SAFE_BOT-.06: continue
         x0, sz, moved = X0, SZ, 0
+        # first: shrink in place (down to the legibility floor) before moving anything sideways
+        floor_px = int(MIN_FONT_PCT*H/100)+2
+        while collides(x0, sz) and sz-4 >= floor_px: sz -= 4
         while collides(x0, sz) and x0 < x1-int(0.2*W):
             x0 += int(0.01*W); moved += 1
             while not fits(x0, sz) and sz > 30: sz -= 2
@@ -112,7 +154,7 @@ def typeset(job):
     report = {"font_pct_of_height": round(fpct, 2), "text_top": round(top, 3), "text_bottom": round(bot, 3),
               "lines": lines, "pass_min_font": fpct >= MIN_FONT_PCT,
               "pass_crop_band": top >= SAFE_TOP-0.001 and bot <= SAFE_BOT+0.001,
-              "shifted_pct": moved, "final_cy": round(cy, 3), "widened_pct": widened, "pass_no_collision": not collision}
+              "shifted_pct": moved, "final_cy": round(cy, 3), "scrim": scrim, "rewrapped": rewrapped, "widened_pct": widened, "pass_no_collision": not collision}
     report["screen"] = screen_info
     report["pass_screen"] = bool((not screen_info["requested"]) or (screen_info.get("found") and screen_info.get("text_pct_of_height", 0) >= 2.5))
     report["pass"] = report["pass_min_font"] and report["pass_crop_band"] and report["pass_no_collision"] and report["pass_screen"]
