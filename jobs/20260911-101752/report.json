@@ -1,0 +1,23 @@
+{
+ "font_pct_of_height": 7.42,
+ "text_top": 0.272,
+ "text_bottom": 0.527,
+ "lines": [
+  "Considering",
+  "weight-loss",
+  "medication?"
+ ],
+ "pass_min_font": true,
+ "pass_crop_band": true,
+ "shifted_pct": 0,
+ "final_cy": 0.4,
+ "scrim": 0.43,
+ "rewrapped": false,
+ "widened_pct": 0,
+ "pass_no_collision": true,
+ "screen": {
+  "requested": false
+ },
+ "pass_screen": true,
+ "pass": true
+}
